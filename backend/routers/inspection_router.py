@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from database import get_db
-from models import User, Permit, Inspection, AuditLog, PermitStatus, UserRole
+from models import User, Permit, Inspection, PermitStatus, UserRole
 from auth import get_current_user, require_role
 from schemas import InspectionCreate, InspectionOut
+from audit_service import log_audit
 
 router = APIRouter(prefix="/api/inspections", tags=["巡检"])
 
@@ -53,9 +54,7 @@ def create_inspection(req: InspectionCreate, db: Session = Depends(get_db), curr
     db.add(insp)
     db.commit()
     db.refresh(insp)
-    log = AuditLog(user_id=current_user.id, action="提交巡检记录", target_type="inspection", target_id=insp.id)
-    db.add(log)
-    db.commit()
+    log_audit(db, current_user.id, "提交巡检记录", "inspection", insp.id)
     return _inspection_to_out(insp, db)
 
 

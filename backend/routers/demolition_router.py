@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 from database import get_db
-from models import User, Permit, Demolition, AuditLog, PermitStatus, UserRole
+from models import User, Permit, Demolition, PermitStatus, UserRole
 from auth import get_current_user, require_role
 from schemas import DemolitionCreate, DemolitionAccept, DemolitionOut
+from audit_service import log_audit
 
 router = APIRouter(prefix="/api/demolitions", tags=["拆除验收"])
 
@@ -84,9 +85,7 @@ def create_demolition(req: DemolitionCreate, db: Session = Depends(get_db), curr
     db.add(d)
     db.commit()
     db.refresh(d)
-    log = AuditLog(user_id=current_user.id, action="提交拆除验收", target_type="demolition", target_id=d.id)
-    db.add(log)
-    db.commit()
+    log_audit(db, current_user.id, "提交拆除验收", "demolition", d.id)
     return _demolition_to_out(d, db)
 
 
@@ -97,9 +96,7 @@ def confirm_restore(demolition_id: int, db: Session = Depends(get_db), current_u
         raise HTTPException(status_code=404, detail="拆除记录不存在")
     d.site_restored = 1
     db.commit()
-    log = AuditLog(user_id=current_user.id, action="确认现场恢复", target_type="demolition", target_id=d.id)
-    db.add(log)
-    db.commit()
+    log_audit(db, current_user.id, "确认现场恢复", "demolition", d.id)
     return {"message": "现场恢复已确认"}
 
 
@@ -153,14 +150,10 @@ def accept_demolition(demolition_id: int, req: DemolitionAccept, db: Session = D
             permit.status = PermitStatus.pending_demolish.value
         db.commit()
 
-    log = AuditLog(
-        user_id=current_user.id,
-        action=f"{'文保员' if role_type == 'heritage' else '安监员'}验收{'通过' if req.accept_result == 'accepted' else '不通过'}",
-        target_type="demolition",
-        target_id=d.id,
-        detail=req.accept_opinion,
+    log_audit(
+        db, current_user.id,
+        f"{'文保员' if role_type == 'heritage' else '安监员'}验收{'通过' if req.accept_result == 'accepted' else '不通过'}",
+        "demolition", d.id, req.accept_opinion,
     )
-    db.add(log)
-    db.commit()
 
     return _demolition_to_out(d, db)

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
 from database import get_db
 from models import User, Permit, Approval, Hazard, AuditLog, UserRole, PermitStatus, HazardStatus, HazardLevel
 from auth import get_current_user, require_role
 from schemas import PermitCreate, PermitOut, ApprovalCreate, ApprovalOut
+from audit_service import add_audit_log
 
 router = APIRouter(prefix="/api/permits", tags=["许可"])
 
@@ -28,11 +28,6 @@ def _permit_to_out(p, db):
         heritage_approved=heritage_app.result == "approved" if heritage_app else False,
         safety_approved=safety_app.result == "approved" if safety_app else False,
     )
-
-
-def _log_audit(db, user_id, action, target_type, target_id, detail=""):
-    log = AuditLog(user_id=user_id, action=action, target_type=target_type, target_id=target_id, detail=detail)
-    db.add(log)
 
 
 @router.get("", response_model=list[PermitOut])
@@ -59,7 +54,7 @@ def create_permit(req: PermitCreate, db: Session = Depends(get_db), current_user
     )
     db.add(p)
     db.flush()
-    _log_audit(db, current_user.id, "提交许可申请", "permit", p.id, f"建筑ID:{req.building_id}")
+    add_audit_log(db, current_user.id, "提交许可申请", "permit", p.id, f"建筑ID:{req.building_id}")
     db.commit()
     db.refresh(p)
     return _permit_to_out(p, db)
@@ -83,7 +78,7 @@ def submit_for_approval(permit_id: int, db: Session = Depends(get_db), current_u
     if p.status != PermitStatus.applied.value:
         raise HTTPException(status_code=400, detail="当前状态不可提交审批")
     p.status = PermitStatus.approving.value
-    _log_audit(db, current_user.id, "提交审批", "permit", p.id)
+    add_audit_log(db, current_user.id, "提交审批", "permit", p.id)
     db.commit()
     return _permit_to_out(p, db)
 
@@ -121,7 +116,7 @@ def approve_permit(permit_id: int, req: ApprovalCreate, db: Session = Depends(ge
             p.status = PermitStatus.can_scaffold.value
     db.commit()
     db.refresh(approval)
-    _log_audit(db, current_user.id, f"{'通过' if req.result == 'approved' else '驳回'}审批", "permit", permit_id, f"类型:{req.approval_type}")
+    add_audit_log(db, current_user.id, f"{'通过' if req.result == 'approved' else '驳回'}审批", "permit", permit_id, f"类型:{req.approval_type}")
     db.commit()
     return ApprovalOut(
         id=approval.id,
@@ -159,7 +154,7 @@ def start_use(permit_id: int, db: Session = Depends(get_db), current_user: User 
     if p.status != PermitStatus.can_scaffold.value:
         raise HTTPException(status_code=400, detail="当前状态不可开始使用")
     p.status = PermitStatus.in_use.value
-    _log_audit(db, current_user.id, "开始使用", "permit", permit_id)
+    add_audit_log(db, current_user.id, "开始使用", "permit", permit_id)
     db.commit()
     return _permit_to_out(p, db)
 
@@ -179,7 +174,7 @@ def request_demolish(permit_id: int, db: Session = Depends(get_db), current_user
     if critical_open:
         raise HTTPException(status_code=400, detail="存在未关闭的重大隐患，禁止申请拆除")
     p.status = PermitStatus.pending_demolish.value
-    _log_audit(db, current_user.id, "申请拆除", "permit", permit_id)
+    add_audit_log(db, current_user.id, "申请拆除", "permit", permit_id)
     db.commit()
     return _permit_to_out(p, db)
 
@@ -192,6 +187,6 @@ def accept_permit(permit_id: int, db: Session = Depends(get_db), current_user: U
     if p.status != PermitStatus.pending_demolish.value:
         raise HTTPException(status_code=400, detail="当前状态不可验收")
     p.status = PermitStatus.accepted.value
-    _log_audit(db, current_user.id, "验收通过", "permit", permit_id)
+    add_audit_log(db, current_user.id, "验收通过", "permit", permit_id)
     db.commit()
     return _permit_to_out(p, db)

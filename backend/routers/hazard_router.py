@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, Hazard, Permit, AuditLog, HazardStatus, HazardLevel, PermitStatus, UserRole
+from models import User, Hazard, Permit, HazardStatus, HazardLevel, PermitStatus, UserRole
 from auth import get_current_user, require_role
 from schemas import HazardCreate, HazardAssign, HazardRectify, HazardRecheck, HazardOut
+from audit_service import log_audit
 
 router = APIRouter(prefix="/api/hazards", tags=["隐患"])
 
@@ -55,9 +56,7 @@ def create_hazard(req: HazardCreate, db: Session = Depends(get_db), current_user
     db.add(h)
     db.commit()
     db.refresh(h)
-    log = AuditLog(user_id=current_user.id, action="创建隐患", target_type="hazard", target_id=h.id, detail=f"等级:{req.level}")
-    db.add(log)
-    db.commit()
+    log_audit(db, current_user.id, "创建隐患", "hazard", h.id, f"等级:{req.level}")
     return _hazard_to_out(h, db)
 
 
@@ -71,9 +70,7 @@ def assign_hazard(hazard_id: int, req: HazardAssign, db: Session = Depends(get_d
     h.assigned_to = req.assigned_to
     h.status = HazardStatus.assigned.value
     db.commit()
-    log = AuditLog(user_id=current_user.id, action="派单隐患", target_type="hazard", target_id=h.id, detail=f"派给:{req.assigned_to}")
-    db.add(log)
-    db.commit()
+    log_audit(db, current_user.id, "派单隐患", "hazard", h.id, f"派给:{req.assigned_to}")
     return _hazard_to_out(h, db)
 
 
@@ -89,9 +86,7 @@ def rectify_hazard(hazard_id: int, req: HazardRectify, db: Session = Depends(get
     h.rectify_result = req.rectify_result
     h.status = HazardStatus.recheck.value
     db.commit()
-    log = AuditLog(user_id=current_user.id, action="提交整改", target_type="hazard", target_id=h.id)
-    db.add(log)
-    db.commit()
+    log_audit(db, current_user.id, "提交整改", "hazard", h.id)
     return _hazard_to_out(h, db)
 
 
@@ -109,7 +104,5 @@ def recheck_hazard(hazard_id: int, req: HazardRecheck, db: Session = Depends(get
     else:
         h.status = HazardStatus.assigned.value
     db.commit()
-    log = AuditLog(user_id=current_user.id, action=f"复查{'通过' if req.recheck_result == 'pass' else '不通过'}", target_type="hazard", target_id=h.id)
-    db.add(log)
-    db.commit()
+    log_audit(db, current_user.id, f"复查{'通过' if req.recheck_result == 'pass' else '不通过'}", "hazard", h.id)
     return _hazard_to_out(h, db)
