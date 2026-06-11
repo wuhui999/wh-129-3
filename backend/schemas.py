@@ -179,6 +179,16 @@ class DemolitionOut(BaseModel):
     acceptor_name: Optional[str] = None
     accept_opinion: str
     accept_result: str
+    heritage_acceptor_id: Optional[int] = None
+    heritage_acceptor_name: Optional[str] = None
+    heritage_result: Optional[str] = None
+    heritage_opinion: Optional[str] = None
+    heritage_accepted_at: Optional[datetime] = None
+    safety_acceptor_id: Optional[int] = None
+    safety_acceptor_name: Optional[str] = None
+    safety_result: Optional[str] = None
+    safety_opinion: Optional[str] = None
+    safety_accepted_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

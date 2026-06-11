@@ -134,10 +134,20 @@ class Demolition(Base):
     acceptor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     accept_opinion = Column(Text, default="")
     accept_result = Column(String(20), default="pending")
+    heritage_acceptor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    heritage_result = Column(String(20), default="pending")
+    heritage_opinion = Column(Text, default="")
+    heritage_accepted_at = Column(DateTime, nullable=True)
+    safety_acceptor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    safety_result = Column(String(20), default="pending")
+    safety_opinion = Column(Text, default="")
+    safety_accepted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     restorer = relationship("User", foreign_keys=[restorer_id])
     acceptor = relationship("User", foreign_keys=[acceptor_id])
+    heritage_acceptor = relationship("User", foreign_keys=[heritage_acceptor_id])
+    safety_acceptor = relationship("User", foreign_keys=[safety_acceptor_id])
 
 
 class AuditLog(Base):

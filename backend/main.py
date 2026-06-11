@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from database import engine, get_db, Base
 from models import User, Building, Permit, Approval, Inspection, Hazard, Demolition, AuditLog, UserRole, PermitStatus, HazardStatus, HazardLevel
 from auth import hash_password
@@ -14,6 +15,29 @@ from routers.audit_router import router as audit_router
 from routers.user_router import router as user_router
 
 Base.metadata.create_all(bind=engine)
+
+
+def migrate_demolitions_table():
+    with engine.connect() as conn:
+        result = conn.execute(text("PRAGMA table_info(demolitions)"))
+        columns = [row[1] for row in result.fetchall()]
+        migrations = [
+            ("heritage_acceptor_id", "INTEGER"),
+            ("heritage_result", "VARCHAR(20) DEFAULT 'pending'"),
+            ("heritage_opinion", "TEXT DEFAULT ''"),
+            ("heritage_accepted_at", "DATETIME"),
+            ("safety_acceptor_id", "INTEGER"),
+            ("safety_result", "VARCHAR(20) DEFAULT 'pending'"),
+            ("safety_opinion", "TEXT DEFAULT ''"),
+            ("safety_accepted_at", "DATETIME"),
+        ]
+        for col_name, col_def in migrations:
+            if col_name not in columns:
+                conn.execute(text(f"ALTER TABLE demolitions ADD COLUMN {col_name} {col_def}"))
+        conn.commit()
+
+
+migrate_demolitions_table()
 
 
 def seed_data():

@@ -62,6 +62,55 @@
           </el-table>
           <el-empty v-else description="暂无巡检记录" />
         </el-card>
+
+        <el-card class="detail-card" v-if="demolition">
+          <template #header>
+            <div class="card-header">
+              <span>拆除验收</span>
+              <el-tag :type="demolition.accept_result === 'accepted' ? 'success' : (demolition.accept_result === 'rejected' ? 'danger' : 'info')" size="small">
+                {{ demolition.accept_result === 'accepted' ? '验收通过' : (demolition.accept_result === 'rejected' ? '验收不通过' : '待验收') }}
+              </el-tag>
+            </div>
+          </template>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="拆除日期">{{ demolition.demolish_date }}</el-descriptions-item>
+            <el-descriptions-item label="现场恢复">
+              <el-tag :type="demolition.site_restored ? 'success' : 'danger'" size="small">
+                {{ demolition.site_restored ? '已恢复' : '未恢复' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="提交人">{{ demolition.restorer_name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="整体结果">
+              <el-tag :type="demolition.accept_result === 'accepted' ? 'success' : (demolition.accept_result === 'rejected' ? 'danger' : 'info')" size="small">
+                {{ demolition.accept_result === 'accepted' ? '通过' : (demolition.accept_result === 'rejected' ? '不通过' : '待验收') }}
+              </el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+          <div class="accept-section">
+            <div class="accept-item">
+              <div class="accept-title">
+                <span :class="demolition.heritage_result === 'accepted' ? 'text-success' : (demolition.heritage_result === 'rejected' ? 'text-danger' : 'text-muted')">文保员验收</span>
+                <el-tag :type="demolition.heritage_result === 'accepted' ? 'success' : (demolition.heritage_result === 'rejected' ? 'danger' : 'info')" size="small">
+                  {{ demolition.heritage_result === 'accepted' ? '通过' : (demolition.heritage_result === 'rejected' ? '不通过' : '待验收') }}
+                </el-tag>
+              </div>
+              <div class="accept-info" v-if="demolition.heritage_acceptor_name">验收人：{{ demolition.heritage_acceptor_name }}</div>
+              <div class="accept-info" v-if="demolition.heritage_opinion">验收意见：{{ demolition.heritage_opinion }}</div>
+              <div class="accept-info" v-if="demolition.heritage_accepted_at">验收时间：{{ demolition.heritage_accepted_at }}</div>
+            </div>
+            <div class="accept-item">
+              <div class="accept-title">
+                <span :class="demolition.safety_result === 'accepted' ? 'text-success' : (demolition.safety_result === 'rejected' ? 'text-danger' : 'text-muted')">安监员验收</span>
+                <el-tag :type="demolition.safety_result === 'accepted' ? 'success' : (demolition.safety_result === 'rejected' ? 'danger' : 'info')" size="small">
+                  {{ demolition.safety_result === 'accepted' ? '通过' : (demolition.safety_result === 'rejected' ? '不通过' : '待验收') }}
+                </el-tag>
+              </div>
+              <div class="accept-info" v-if="demolition.safety_acceptor_name">验收人：{{ demolition.safety_acceptor_name }}</div>
+              <div class="accept-info" v-if="demolition.safety_opinion">验收意见：{{ demolition.safety_opinion }}</div>
+              <div class="accept-info" v-if="demolition.safety_accepted_at">验收时间：{{ demolition.safety_accepted_at }}</div>
+            </div>
+          </div>
+        </el-card>
       </el-col>
 
       <el-col :span="8">
@@ -110,7 +159,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getPermit, getApprovals, getInspections, getHazards, submitPermit, startUsePermit, requestDemolish, createDemolition } from '../api'
+import { getPermit, getApprovals, getInspections, getHazards, getDemolitions, submitPermit, startUsePermit, requestDemolish, createDemolition } from '../api'
 import { getUser, statusMap, statusTagType, hazardLevelMap, hazardLevelTagType, hazardStatusMap } from '../utils/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -120,6 +169,7 @@ const permit = ref(null)
 const approvals = ref([])
 const inspections = ref([])
 const hazards = ref([])
+const demolition = ref(null)
 const loading = ref(true)
 const showDemolishDialog = ref(false)
 const demolishForm = ref({ demolish_date: '', site_restored: 0 })
@@ -130,6 +180,8 @@ const loadData = async () => {
   approvals.value = await getApprovals(id)
   inspections.value = await getInspections({ permit_id: id })
   hazards.value = await getHazards({ permit_id: id })
+  const demolitions = await getDemolitions({ permit_id: id })
+  demolition.value = demolitions && demolitions.length ? demolitions[0] : null
   loading.value = false
 }
 
@@ -178,4 +230,10 @@ onMounted(loadData)
 .hazard-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
 .hazard-desc { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .text-muted { color: #c0c4cc; }
+.text-success { color: #67c23a; font-weight: 600; }
+.text-danger { color: #f56c6c; font-weight: 600; }
+.accept-section { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.accept-item { padding: 10px 12px; background: #fafafa; border-radius: 6px; border: 1px solid #ebeef5; }
+.accept-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 14px; }
+.accept-info { font-size: 12px; color: #606266; margin-top: 2px; }
 </style>
